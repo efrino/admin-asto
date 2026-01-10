@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Edit2, Trash2, Save, X, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import { hashPassword } from '../utils/auth';
+import { parseExcelFile, generateExcelTemplate, downloadExcel } from '../utils/excelUtils';
 
 export const UsersTab = ({ onStatsUpdate }) => {
     const [users, setUsers] = useState([]);
@@ -16,6 +17,11 @@ export const UsersTab = ({ onStatsUpdate }) => {
         is_active: true
     });
     const [showUserForm, setShowUserForm] = useState(false);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, status: '' });
+    const [uploadResults, setUploadResults] = useState({ success: 0, failed: 0, errors: [] });
+    const [isUploading, setIsUploading] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         fetchUsers();
@@ -48,6 +54,7 @@ export const UsersTab = ({ onStatsUpdate }) => {
                 .from('users')
                 .insert([{
                     ...userFormData,
+                    nrp: userFormData.nrp.toUpperCase(),
                     password: hashedPassword,
                     created_at: new Date().toISOString(),
                     updated_at: new Date().toISOString()
@@ -68,6 +75,7 @@ export const UsersTab = ({ onStatsUpdate }) => {
         try {
             const updateData = {
                 ...userFormData,
+                nrp: userFormData.nrp.toUpperCase(),
                 updated_at: new Date().toISOString()
             };
 
@@ -138,18 +146,245 @@ export const UsersTab = ({ onStatsUpdate }) => {
         setShowUserForm(false);
     };
 
+    const handleDownloadTemplate = () => {
+        const templateData = generateExcelTemplate();
+        downloadExcel(templateData, 'user_upload_template.xlsx');
+    };
+
+    const handleFileSelect = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        const validTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'text/csv'
+        ];
+
+        if (!validTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
+            alert('File harus berformat Excel (.xlsx, .xls) atau CSV (.csv)');
+            return;
+        }
+
+        setIsUploading(true);
+        setUploadResults({ success: 0, failed: 0, errors: [] });
+
+        try {
+            const parsedData = await parseExcelFile(file);
+
+            if (parsedData.length === 0) {
+                alert('File tidak memiliki data atau format tidak sesuai');
+                setIsUploading(false);
+                return;
+            }
+
+            setUploadProgress({ current: 0, total: parsedData.length, status: 'Processing...' });
+
+            let successCount = 0;
+            let failedCount = 0;
+            const errors = [];
+
+            for (let i = 0; i < parsedData.length; i++) {
+                const row = parsedData[i];
+                setUploadProgress({
+                    current: i + 1,
+                    total: parsedData.length,
+                    status: `Processing ${row.nrp || 'row ' + (i + 1)}...`
+                });
+
+                try {
+                    // Validate required fields
+                    if (!row.nrp || !row.full_name || !row.password) {
+                        throw new Error('NRP, Full Name, dan Password wajib diisi');
+                    }
+
+                    const hashedPassword = await hashPassword(row.password);
+
+                    const { error } = await supabase
+                        .from('users')
+                        .insert([{
+                            nrp: row.nrp.toString().toUpperCase(),
+                            full_name: row.full_name,
+                            department: row.department || null,
+                            position: row.position || null,
+                            password: hashedPassword,
+                            role: row.role?.toLowerCase() === 'admin' ? 'admin' : 'user',
+                            is_active: row.is_active !== false && row.is_active?.toString().toLowerCase() !== 'false',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }]);
+
+                    if (error) throw error;
+                    successCount++;
+                } catch (error) {
+                    failedCount++;
+                    errors.push({
+                        row: i + 2, // +2 because Excel rows start at 1 and header is row 1
+                        nrp: row.nrp || 'N/A',
+                        error: error.message
+                    });
+                }
+            }
+
+            setUploadResults({ success: successCount, failed: failedCount, errors });
+            setUploadProgress({ current: parsedData.length, total: parsedData.length, status: 'Complete!' });
+
+            // Refresh user list
+            await fetchUsers();
+            onStatsUpdate?.();
+
+        } catch (error) {
+            alert('Error processing file: ' + error.message);
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const closeUploadModal = () => {
+        setShowUploadModal(false);
+        setUploadProgress({ current: 0, total: 0, status: '' });
+        setUploadResults({ success: 0, failed: 0, errors: [] });
+        setIsUploading(false);
+    };
+
     return (
         <>
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">User Management</h2>
-                <button
-                    onClick={() => setShowUserForm(!showUserForm)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    {showUserForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                    {showUserForm ? 'Cancel' : 'Add User'}
-                </button>
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setShowUploadModal(true)}
+                        className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                        <Upload className="w-5 h-5" />
+                        Upload Excel
+                    </button>
+                    <button
+                        onClick={() => setShowUserForm(!showUserForm)}
+                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                        {showUserForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+                        {showUserForm ? 'Cancel' : 'Add User'}
+                    </button>
+                </div>
             </div>
+
+            {/* Upload Modal */}
+            {showUploadModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg mx-4">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold text-gray-800">Upload Users via Excel</h3>
+                            <button onClick={closeUploadModal} className="text-gray-500 hover:text-gray-700">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {/* Download Template */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div className="flex items-start gap-3">
+                                    <FileSpreadsheet className="w-6 h-6 text-blue-600 mt-0.5" />
+                                    <div className="flex-1">
+                                        <p className="text-sm text-blue-800 font-medium">Download Template</p>
+                                        <p className="text-xs text-blue-600 mt-1">
+                                            Download template Excel untuk format data yang benar
+                                        </p>
+                                        <button
+                                            onClick={handleDownloadTemplate}
+                                            className="mt-2 flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+                                        >
+                                            <Download className="w-4 h-4" />
+                                            Download Template
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Upload Area */}
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={handleFileSelect}
+                                    accept=".xlsx,.xls,.csv"
+                                    className="hidden"
+                                    id="excel-upload"
+                                    disabled={isUploading}
+                                />
+                                <label
+                                    htmlFor="excel-upload"
+                                    className={`cursor-pointer ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                                    <p className="text-sm text-gray-600">
+                                        {isUploading ? 'Processing...' : 'Click to upload or drag and drop'}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        Excel (.xlsx, .xls) or CSV files
+                                    </p>
+                                </label>
+                            </div>
+
+                            {/* Progress */}
+                            {uploadProgress.total > 0 && (
+                                <div className="bg-gray-50 rounded-lg p-4">
+                                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                                        <span>{uploadProgress.status}</span>
+                                        <span>{uploadProgress.current} / {uploadProgress.total}</span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2">
+                                        <div
+                                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                            style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Results */}
+                            {(uploadResults.success > 0 || uploadResults.failed > 0) && (
+                                <div className="space-y-3">
+                                    <div className="flex gap-4">
+                                        <div className="flex-1 bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                                            <p className="text-2xl font-bold text-green-600">{uploadResults.success}</p>
+                                            <p className="text-xs text-green-700">Success</p>
+                                        </div>
+                                        <div className="flex-1 bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                                            <p className="text-2xl font-bold text-red-600">{uploadResults.failed}</p>
+                                            <p className="text-xs text-red-700">Failed</p>
+                                        </div>
+                                    </div>
+
+                                    {uploadResults.errors.length > 0 && (
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-40 overflow-y-auto">
+                                            <p className="text-sm font-medium text-red-800 mb-2">Errors:</p>
+                                            {uploadResults.errors.map((err, idx) => (
+                                                <p key={idx} className="text-xs text-red-600 mb-1">
+                                                    Row {err.row} (NRP: {err.nrp}): {err.error}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 flex justify-end">
+                            <button
+                                onClick={closeUploadModal}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showUserForm && (
                 <div className="bg-gray-50 rounded-xl p-6 mb-6">

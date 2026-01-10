@@ -5,6 +5,7 @@ import { Header } from './components/Header';
 import { StatsCards } from './components/StatsCards';
 import { UsersTab } from './components/UsersTab';
 import { ActivitiesTab } from './components/ActivitiesTab';
+import { ModulesTab } from './components/ModulesTab';
 import { supabase } from './config/supabase';
 
 function App() {
@@ -14,7 +15,9 @@ function App() {
     totalUsers: 0,
     activeUsers: 0,
     totalActivities: 0,
-    todayActivities: 0
+    todayActivities: 0,
+    totalModules: 0,
+    activeModules: 0
   });
 
   useEffect(() => {
@@ -27,6 +30,7 @@ function App() {
     try {
       const { data: usersData } = await supabase.from('users').select('*');
       const { data: activitiesData } = await supabase.from('activity_logs').select('*');
+      const { data: modulesData } = await supabase.from('modules').select('*');
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -39,7 +43,9 @@ function App() {
         totalUsers: usersData?.length || 0,
         activeUsers: usersData?.filter(u => u.is_active).length || 0,
         totalActivities: activitiesData?.length || 0,
-        todayActivities
+        todayActivities,
+        totalModules: modulesData?.length || 0,
+        activeModules: modulesData?.filter(m => m.is_active).length || 0
       });
     } catch (error) {
       console.error('Error calculating stats:', error);
@@ -70,21 +76,30 @@ function App() {
         <StatsCards stats={stats} />
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <div className="flex gap-4 mb-6 border-b">
+          <div className="flex gap-4 mb-6 border-b overflow-x-auto">
             <button
               onClick={() => setActiveTab('users')}
-              className={`pb-3 px-4 font-semibold transition-colors ${activeTab === 'users'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'users'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
               Users Management
             </button>
             <button
+              onClick={() => setActiveTab('modules')}
+              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'modules'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Modules Management
+            </button>
+            <button
               onClick={() => setActiveTab('activities')}
-              className={`pb-3 px-4 font-semibold transition-colors ${activeTab === 'activities'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-gray-500 hover:text-gray-700'
+              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'activities'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
               Activity Logs
@@ -92,6 +107,7 @@ function App() {
           </div>
 
           {activeTab === 'users' && <UsersTab onStatsUpdate={calculateStats} />}
+          {activeTab === 'modules' && <ModulesTab admin={admin} onStatsUpdate={calculateStats} />}
           {activeTab === 'activities' && <ActivitiesTab />}
         </div>
       </div>
