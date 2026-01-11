@@ -6,6 +6,7 @@ import { StatsCards } from './components/StatsCards';
 import { UsersTab } from './components/UsersTab';
 import { ActivitiesTab } from './components/ActivitiesTab';
 import { ModulesTab } from './components/ModulesTab';
+import { QuizzesTab } from './components/QuizzesTab';
 import { supabase } from './config/supabase';
 
 function App() {
@@ -17,7 +18,9 @@ function App() {
     totalActivities: 0,
     todayActivities: 0,
     totalModules: 0,
-    activeModules: 0
+    activeModules: 0,
+    totalQuizzes: 0,
+    activeQuizzes: 0
   });
 
   useEffect(() => {
@@ -31,6 +34,7 @@ function App() {
       const { data: usersData } = await supabase.from('users').select('*');
       const { data: activitiesData } = await supabase.from('activity_logs').select('*');
       const { data: modulesData } = await supabase.from('modules').select('*');
+      const { data: quizzesData } = await supabase.from('quizzes').select('*');
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -45,7 +49,9 @@ function App() {
         totalActivities: activitiesData?.length || 0,
         todayActivities,
         totalModules: modulesData?.length || 0,
-        activeModules: modulesData?.filter(m => m.is_active).length || 0
+        activeModules: modulesData?.filter(m => m.is_active).length || 0,
+        totalQuizzes: quizzesData?.length || 0,
+        activeQuizzes: quizzesData?.filter(q => q.is_active).length || 0
       });
     } catch (error) {
       console.error('Error calculating stats:', error);
@@ -96,6 +102,15 @@ function App() {
               Modules Management
             </button>
             <button
+              onClick={() => setActiveTab('quizzes')}
+              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'quizzes'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Quiz / Sertifikasi
+            </button>
+            <button
               onClick={() => setActiveTab('activities')}
               className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'activities'
                 ? 'border-b-2 border-blue-600 text-blue-600'
@@ -108,6 +123,7 @@ function App() {
 
           {activeTab === 'users' && <UsersTab onStatsUpdate={calculateStats} />}
           {activeTab === 'modules' && <ModulesTab admin={admin} onStatsUpdate={calculateStats} />}
+          {activeTab === 'quizzes' && <QuizzesTab onStatsUpdate={calculateStats} />}
           {activeTab === 'activities' && <ActivitiesTab />}
         </div>
       </div>

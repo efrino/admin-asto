@@ -18,8 +18,20 @@ export const FOLDER_IDS = {
     thumbnail: "1ZNLeUtdeT_ktA4ievQzjxLTapDI2fDx2",
   },
   meca_aid: {
-    content: "1mad2zUcVTKmNjvTwk3bVgAtAAvCy-Pfb",
+    content: "1z9n-TmJWCqkmA3yui8KFqLZz7goG_a6Z",
     thumbnail: "16CCWrRpnANm1TuCtRwUe8M0J5PxGM8Kz",
+  },
+  meca_sheet: {
+    content: "1pLYHPkjLrrxtF4ogVPosQQFwxV0yk2Gy",
+    thumbnail: "1O24-qYVmoXNC56MLynmrrTD4O-3UPr2i",
+  },
+  quiz: {
+    content: "1UTR3ymVRGJxwvsYYbqO-FlJovApiMgkg",
+    thumbnail: "1Fa3lLI4GmqM3aLjMr4XO1RJ8ilU8F_1E",
+  },
+  error_code: {
+    content: "1697CAmmza20sVJnwei29CdYemjsbfejB",
+    thumbnail: "1Or98JF15h6Cw33zoPVoKQpUvPPqnYW6C",
   },
 };
 
@@ -45,9 +57,9 @@ async function getAuthHeaders() {
 
 /**
  * List files from Google Drive folder via Edge Function
- * @param {string} category - 'module', 'animation', or 'meca_aid'
+ * @param {string} category - 'module', 'animation', 'meca_aid', or 'quiz'
  * @param {string} type - 'content' or 'thumbnail'
- * @returns {Promise<Array>} List of files
+ * @returns {Promise<Object>} Result with success status and data
  */
 export async function listDriveFiles(category = "module", type = "content") {
   try {
@@ -62,12 +74,82 @@ export async function listDriveFiles(category = "module", type = "content") {
     const result = await response.json();
 
     if (!result.success) {
-      throw new Error(result.error || "Failed to fetch files");
+      return {
+        success: false,
+        error: result.error || "Failed to fetch files",
+        data: [],
+      };
     }
 
-    return result.data;
+    return { success: true, data: result.data || [] };
   } catch (error) {
     console.error("Error listing Drive files:", error);
+    return { success: false, error: error.message, data: [] };
+  }
+}
+
+/**
+ * Get file download URL from Google Drive via Edge Function
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Promise<Object>} Result with success status and download URL
+ */
+export async function getFileDownloadUrl(fileId) {
+  try {
+    const headers = await getAuthHeaders();
+    const url = `${EDGE_FUNCTION_URL}?action=download&fileId=${fileId}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || "Failed to get download URL",
+      };
+    }
+
+    return {
+      success: true,
+      downloadUrl: result.downloadUrl,
+      mimeType: result.mimeType,
+      accessToken: result.accessToken,
+      fileName: result.fileName,
+    };
+  } catch (error) {
+    console.error("Error getting file download URL:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Download file from Google Drive
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Promise<ArrayBuffer>} File content as ArrayBuffer
+ */
+export async function downloadFile(fileId) {
+  try {
+    const urlResult = await getFileDownloadUrl(fileId);
+    if (!urlResult.success) {
+      throw new Error(urlResult.error);
+    }
+
+    const response = await fetch(urlResult.downloadUrl, {
+      headers: {
+        Authorization: `Bearer ${urlResult.accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.status}`);
+    }
+
+    return await response.arrayBuffer();
+  } catch (error) {
+    console.error("Error downloading file:", error);
     throw error;
   }
 }

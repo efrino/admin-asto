@@ -17,7 +17,7 @@ const SERVICE_ACCOUNT = {
 };
 
 // Folder IDs mapping
-const FOLDER_IDS = {
+const FOLDER_IDS: Record<string, { content: string; thumbnail: string | null }> = {
   module: {
     content: "1mad2zUcVTKmNjvTwk3bVgAtAAvCy-Pfb",
     thumbnail: "16CCWrRpnANm1TuCtRwUe8M0J5PxGM8Kz"
@@ -27,15 +27,27 @@ const FOLDER_IDS = {
     thumbnail: "1ZNLeUtdeT_ktA4ievQzjxLTapDI2fDx2"
   },
   meca_aid: {
-    content: "1mad2zUcVTKmNjvTwk3bVgAtAAvCy-Pfb", // Same as module, adjust if different
+    content: "1z9n-TmJWCqkmA3yui8KFqLZz7goG_a6Z",
     thumbnail: "16CCWrRpnANm1TuCtRwUe8M0J5PxGM8Kz"
+  },
+  meca_sheet: {
+    content: "1pLYHPkjLrrxtF4ogVPosQQFwxV0yk2Gy",
+    thumbnail: "1O24-qYVmoXNC56MLynmrrTD4O-3UPr2i"
+  },
+  quiz: {
+    content: "1UTR3ymVRGJxwvsYYbqO-FlJovApiMgkg",
+    thumbnail: "1Fa3lLI4GmqM3aLjMr4XO1RJ8ilU8F_1E"
+  },
+  error_code: {
+    content: "1697CAmmza20sVJnwei29CdYemjsbfejB",
+    thumbnail: "1Or98JF15h6Cw33zoPVoKQpUvPPqnYW6C"
   }
 };
 
 // Generate JWT for Google API authentication
 async function getAccessToken(): Promise<string> {
   const privateKey = SERVICE_ACCOUNT.private_key;
-  
+
   if (!privateKey) {
     throw new Error("Private key not configured");
   }
@@ -45,7 +57,7 @@ async function getAccessToken(): Promise<string> {
   const pemFooter = "-----END PRIVATE KEY-----";
   const pemContents = privateKey.replace(pemHeader, "").replace(pemFooter, "").replace(/\s/g, "");
   const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-  
+
   const cryptoKey = await crypto.subtle.importKey(
     "pkcs8",
     binaryDer,
@@ -78,11 +90,11 @@ async function getAccessToken(): Promise<string> {
   });
 
   const tokenData = await tokenResponse.json();
-  
+
   if (!tokenData.access_token) {
     throw new Error(`Failed to get access token: ${JSON.stringify(tokenData)}`);
   }
-  
+
   return tokenData.access_token;
 }
 
@@ -90,9 +102,9 @@ async function getAccessToken(): Promise<string> {
 async function listFiles(folderId: string, accessToken: string) {
   const query = `'${folderId}' in parents and trashed = false`;
   const fields = "files(id,name,mimeType,thumbnailLink,webViewLink,webContentLink,size,createdTime,modifiedTime)";
-  
+
   const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&orderBy=name&pageSize=100`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -100,7 +112,7 @@ async function listFiles(folderId: string, accessToken: string) {
   });
 
   const data = await response.json();
-  
+
   if (data.error) {
     throw new Error(`Google Drive API error: ${data.error.message}`);
   }
@@ -112,7 +124,7 @@ async function listFiles(folderId: string, accessToken: string) {
 async function getFileMetadata(fileId: string, accessToken: string) {
   const fields = "id,name,mimeType,thumbnailLink,webViewLink,webContentLink,size,createdTime,modifiedTime,videoMediaMetadata";
   const url = `https://www.googleapis.com/drive/v3/files/${fileId}?fields=${encodeURIComponent(fields)}`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -122,7 +134,7 @@ async function getFileMetadata(fileId: string, accessToken: string) {
   return await response.json();
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -147,10 +159,14 @@ serve(async (req) => {
         if (!folderConfig) {
           throw new Error(`Invalid category: ${category}`);
         }
-        
+
         const folderId = type === "thumbnail" ? folderConfig.thumbnail : folderConfig.content;
+        if (!folderId) {
+          throw new Error(`No ${type} folder configured for category: ${category}`);
+        }
+
         const files = await listFiles(folderId, accessToken);
-        
+
         // Format response with additional info
         result = files.map((file: any) => ({
           id: file.id,
@@ -176,6 +192,40 @@ serve(async (req) => {
         break;
       }
 
+      case "download": {
+        // Get file download URL for Word documents etc
+        if (!fileId) {
+          throw new Error("fileId is required for download action");
+        }
+
+        // Get file metadata first
+        const metadata = await getFileMetadata(fileId, accessToken);
+
+        // For Google Docs/Sheets, export as appropriate format
+        // For regular files, use webContentLink
+        let downloadUrl: string;
+
+        if (metadata.mimeType === "application/vnd.google-apps.document") {
+          // Export Google Doc as docx
+          downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`;
+        } else {
+          // Regular file - use direct download
+          downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
+        }
+
+        // Return the download URL with auth token embedded (for client to use)
+        // Note: For security, we proxy the download through our function
+        return new Response(JSON.stringify({
+          success: true,
+          downloadUrl: downloadUrl,
+          mimeType: metadata.mimeType,
+          accessToken: accessToken, // Client will use this for download
+          fileName: metadata.name
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       case "folders": {
         // Return folder configuration
         result = FOLDER_IDS;
@@ -190,12 +240,13 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || "Unknown error occurred" 
+      JSON.stringify({
+        success: false,
+        error: errorMessage
       }),
       {
         status: 500,
