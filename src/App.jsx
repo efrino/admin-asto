@@ -7,6 +7,9 @@ import { UsersTab } from './components/UsersTab';
 import { ActivitiesTab } from './components/ActivitiesTab';
 import { ModulesTab } from './components/ModulesTab';
 import { QuizzesTab } from './components/QuizzesTab';
+import { MecaSheetTab } from './components/MecaSheetTab';
+import { ErrorCodesTab } from './components/ErrorCodesTab';
+import { MecaAidTab } from './components/MecaAidTab';
 import { supabase } from './config/supabase';
 
 function App() {
@@ -20,7 +23,9 @@ function App() {
     totalModules: 0,
     activeModules: 0,
     totalQuizzes: 0,
-    activeQuizzes: 0
+    activeQuizzes: 0,
+    totalErrorCodes: 0,
+    activeErrorCodes: 0
   });
 
   useEffect(() => {
@@ -35,6 +40,15 @@ function App() {
       const { data: activitiesData } = await supabase.from('activity_logs').select('*');
       const { data: modulesData } = await supabase.from('modules').select('*');
       const { data: quizzesData } = await supabase.from('quizzes').select('*');
+
+      // Try to get error_codes, but don't fail if table doesn't exist yet
+      let errorCodesData = [];
+      try {
+        const { data } = await supabase.from('error_codes').select('*');
+        errorCodesData = data || [];
+      } catch (e) {
+        // Table might not exist yet
+      }
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -51,7 +65,9 @@ function App() {
         totalModules: modulesData?.length || 0,
         activeModules: modulesData?.filter(m => m.is_active).length || 0,
         totalQuizzes: quizzesData?.length || 0,
-        activeQuizzes: quizzesData?.filter(q => q.is_active).length || 0
+        activeQuizzes: quizzesData?.filter(q => q.is_active).length || 0,
+        totalErrorCodes: errorCodesData?.length || 0,
+        activeErrorCodes: errorCodesData?.filter(e => e.is_active).length || 0
       });
     } catch (error) {
       console.error('Error calculating stats:', error);
@@ -82,29 +98,56 @@ function App() {
         <StatsCards stats={stats} />
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
-          <div className="flex gap-4 mb-6 border-b overflow-x-auto">
+          <div className="flex gap-2 mb-6 border-b overflow-x-auto pb-1">
             <button
               onClick={() => setActiveTab('users')}
-              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'users'
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'users'
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
-              Users Management
+              Users
             </button>
             <button
               onClick={() => setActiveTab('modules')}
-              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'modules'
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'modules'
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
-              Modules Management
+              Modules
+            </button>
+            <button
+              onClick={() => setActiveTab('meca_sheet')}
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'meca_sheet'
+                ? 'border-b-2 border-green-600 text-green-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Meca Sheet
+            </button>
+            <button
+              onClick={() => setActiveTab('meca_aid')}
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'meca_aid'
+                ? 'border-b-2 border-orange-600 text-orange-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Meca Aid
+            </button>
+            <button
+              onClick={() => setActiveTab('error_codes')}
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'error_codes'
+                ? 'border-b-2 border-red-600 text-red-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Error Codes
             </button>
             <button
               onClick={() => setActiveTab('quizzes')}
-              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'quizzes'
-                ? 'border-b-2 border-blue-600 text-blue-600'
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'quizzes'
+                ? 'border-b-2 border-purple-600 text-purple-600'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
             >
@@ -112,7 +155,7 @@ function App() {
             </button>
             <button
               onClick={() => setActiveTab('activities')}
-              className={`pb-3 px-4 font-semibold transition-colors whitespace-nowrap ${activeTab === 'activities'
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'activities'
                 ? 'border-b-2 border-blue-600 text-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -123,6 +166,9 @@ function App() {
 
           {activeTab === 'users' && <UsersTab onStatsUpdate={calculateStats} />}
           {activeTab === 'modules' && <ModulesTab admin={admin} onStatsUpdate={calculateStats} />}
+          {activeTab === 'meca_sheet' && <MecaSheetTab admin={admin} onStatsUpdate={calculateStats} />}
+          {activeTab === 'meca_aid' && <MecaAidTab admin={admin} onStatsUpdate={calculateStats} />}
+          {activeTab === 'error_codes' && <ErrorCodesTab admin={admin} onStatsUpdate={calculateStats} />}
           {activeTab === 'quizzes' && <QuizzesTab onStatsUpdate={calculateStats} />}
           {activeTab === 'activities' && <ActivitiesTab />}
         </div>
