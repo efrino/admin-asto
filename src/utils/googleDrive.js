@@ -89,6 +89,58 @@ export async function listDriveFiles(category = "module", type = "content") {
 }
 
 /**
+ * List files from a specific Google Drive folder by folder ID
+ * @param {string} folderId - Google Drive folder ID
+ * @param {object} options - Optional filters (fileTypes: array of 'pdf', 'excel', 'image', etc)
+ * @returns {Promise<Object>} Result with success status and data
+ */
+export async function listFilesInFolder(folderId, options = {}) {
+  try {
+    if (!folderId) {
+      return { success: false, error: "Folder ID is required", data: [] };
+    }
+
+    const headers = await getAuthHeaders();
+    const url = `${EDGE_FUNCTION_URL}?action=listFolder&folderId=${folderId}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+
+    const result = await response.json();
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error || "Failed to fetch files from folder",
+        data: [],
+      };
+    }
+
+    let files = result.data || [];
+
+    // Apply file type filter if specified
+    if (options.fileTypes && options.fileTypes.length > 0) {
+      files = files.filter((file) => {
+        const fileType = determineFileType(file.mimeType || file.name);
+        return options.fileTypes.some((type) => {
+          if (type === "excel") {
+            return ["xls", "xlsx"].includes(fileType);
+          }
+          return fileType === type;
+        });
+      });
+    }
+
+    return { success: true, data: files };
+  } catch (error) {
+    console.error("Error listing files in folder:", error);
+    return { success: false, error: error.message, data: [] };
+  }
+}
+
+/**
  * Get file download URL from Google Drive via Edge Function
  * @param {string} fileId - Google Drive file ID
  * @returns {Promise<Object>} Result with success status and download URL
@@ -244,12 +296,22 @@ export function extractFileId(url) {
 /**
  * Determine file type from MIME type or filename
  * @param {string} mimeTypeOrName - MIME type or filename
- * @returns {string} File type (pdf, mp4, image)
+ * @returns {string} File type (pdf, mp4, image, xlsx, xls)
  */
 export function determineFileType(mimeTypeOrName) {
+  if (!mimeTypeOrName) return "unknown";
+
   const lower = mimeTypeOrName.toLowerCase();
 
+  // PDF
   if (lower.includes("pdf") || lower.endsWith(".pdf")) return "pdf";
+
+  // Excel files
+  if (lower.includes("spreadsheetml") || lower.endsWith(".xlsx")) return "xlsx";
+  if (lower.includes("ms-excel") || lower.endsWith(".xls")) return "xls";
+  if (lower.includes("google-apps.spreadsheet")) return "xlsx"; // Google Sheets
+
+  // Video
   if (
     lower.includes("video") ||
     lower.endsWith(".mp4") ||
@@ -257,6 +319,8 @@ export function determineFileType(mimeTypeOrName) {
     lower.endsWith(".mov")
   )
     return "mp4";
+
+  // Image
   if (
     lower.includes("image") ||
     lower.endsWith(".jpg") ||
@@ -267,7 +331,59 @@ export function determineFileType(mimeTypeOrName) {
   )
     return "image";
 
-  return "pdf"; // default
+  // SWF (Flash)
+  if (lower.includes("flash") || lower.endsWith(".swf")) return "swf";
+
+  return "unknown";
+}
+
+/**
+ * Check if file is PDF or Excel
+ * @param {object} file - File object with mimeType or name
+ * @returns {boolean}
+ */
+export function isPdfOrExcel(file) {
+  const type = determineFileType(file.mimeType || file.name);
+  return ["pdf", "xls", "xlsx"].includes(type);
+}
+
+/**
+ * Filter files to only PDF and Excel
+ * @param {array} files - Array of file objects
+ * @returns {array} Filtered files
+ */
+export function filterPdfAndExcel(files) {
+  if (!Array.isArray(files)) return [];
+  return files.filter((file) => isPdfOrExcel(file));
+}
+
+/**
+ * Check if file is a folder
+ * @param {object} file - File object with mimeType
+ * @returns {boolean}
+ */
+export function isFolder(file) {
+  return file.mimeType === "application/vnd.google-apps.folder";
+}
+
+/**
+ * Filter to get only folders
+ * @param {array} files - Array of file objects
+ * @returns {array} Filtered folders
+ */
+export function filterFolders(files) {
+  if (!Array.isArray(files)) return [];
+  return files.filter((file) => isFolder(file));
+}
+
+/**
+ * Filter to get only files (non-folders)
+ * @param {array} files - Array of file objects
+ * @returns {array} Filtered files
+ */
+export function filterNonFolders(files) {
+  if (!Array.isArray(files)) return [];
+  return files.filter((file) => !isFolder(file));
 }
 
 /**
@@ -305,10 +421,21 @@ export function getFolderId(category, type = "content") {
 
 /**
  * Open Google Drive folder in new tab
- * @param {string} category - Category name
- * @param {string} type - 'content' or 'thumbnail'
+ * @param {string} categoryOrFolderId - Category name or direct folder ID
+ * @param {string} type - 'content' or 'thumbnail' (only used if first param is category)
  */
-export function openDriveFolder(category, type = "content") {
-  const folderId = getFolderId(category, type);
-  window.open(`https://drive.google.com/drive/folders/${folderId}`, "_blank");
+export function openDriveFolder(categoryOrFolderId, type = "content") {
+  let folderId;
+
+  // Check if it's a category name or direct folder ID
+  if (FOLDER_IDS[categoryOrFolderId]) {
+    folderId = getFolderId(categoryOrFolderId, type);
+  } else {
+    // Assume it's a direct folder ID
+    folderId = categoryOrFolderId;
+  }
+
+  if (folderId) {
+    window.open(`https://drive.google.com/drive/folders/${folderId}`, "_blank");
+  }
 }

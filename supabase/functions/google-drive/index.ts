@@ -134,6 +134,46 @@ async function getFileMetadata(fileId: string, accessToken: string) {
   return await response.json();
 }
 
+// Helper to determine file type from MIME type
+function getFileType(mimeType: string): string {
+  if (!mimeType) return "unknown";
+
+  // PDF
+  if (mimeType === "application/pdf") return "pdf";
+
+  // Excel files
+  if (mimeType === "application/vnd.ms-excel") return "xls";
+  if (mimeType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") return "xlsx";
+  if (mimeType === "application/vnd.google-apps.spreadsheet") return "xlsx"; // Google Sheets
+
+  // Video
+  if (mimeType.startsWith("video/")) return "mp4";
+
+  // Image
+  if (mimeType.startsWith("image/")) return "image";
+
+  // Folder
+  if (mimeType === "application/vnd.google-apps.folder") return "folder";
+
+  return "other";
+}
+
+// Format files response
+function formatFilesResponse(files: any[]) {
+  return files.map((file: any) => ({
+    id: file.id,
+    name: file.name,
+    mimeType: file.mimeType,
+    thumbnailUrl: file.thumbnailLink || `https://drive.google.com/thumbnail?id=${file.id}&sz=w200`,
+    viewUrl: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
+    downloadUrl: file.webContentLink,
+    size: file.size ? parseInt(file.size) : null,
+    createdTime: file.createdTime,
+    modifiedTime: file.modifiedTime,
+    fileType: getFileType(file.mimeType),
+  }));
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -146,6 +186,7 @@ serve(async (req: Request) => {
     const category = url.searchParams.get("category") || "module";
     const type = url.searchParams.get("type") || "content"; // content or thumbnail
     const fileId = url.searchParams.get("fileId");
+    const folderId = url.searchParams.get("folderId"); // For listFolder action
 
     // Get access token
     const accessToken = await getAccessToken();
@@ -154,32 +195,30 @@ serve(async (req: Request) => {
 
     switch (action) {
       case "list": {
-        // List files from folder
+        // List files from predefined folder by category
         const folderConfig = FOLDER_IDS[category as keyof typeof FOLDER_IDS];
         if (!folderConfig) {
           throw new Error(`Invalid category: ${category}`);
         }
 
-        const folderId = type === "thumbnail" ? folderConfig.thumbnail : folderConfig.content;
-        if (!folderId) {
+        const targetFolderId = type === "thumbnail" ? folderConfig.thumbnail : folderConfig.content;
+        if (!targetFolderId) {
           throw new Error(`No ${type} folder configured for category: ${category}`);
         }
 
-        const files = await listFiles(folderId, accessToken);
+        const files = await listFiles(targetFolderId, accessToken);
+        result = formatFilesResponse(files);
+        break;
+      }
 
-        // Format response with additional info
-        result = files.map((file: any) => ({
-          id: file.id,
-          name: file.name,
-          mimeType: file.mimeType,
-          thumbnailUrl: file.thumbnailLink || `https://drive.google.com/thumbnail?id=${file.id}&sz=w200`,
-          viewUrl: file.webViewLink || `https://drive.google.com/file/d/${file.id}/view`,
-          downloadUrl: file.webContentLink,
-          size: file.size,
-          createdTime: file.createdTime,
-          modifiedTime: file.modifiedTime,
-          fileType: getFileType(file.mimeType),
-        }));
+      case "listFolder": {
+        // List files from a specific folder ID (for dynamic folder access like Meca Aid subfolders)
+        if (!folderId) {
+          throw new Error("folderId is required for listFolder action");
+        }
+
+        const files = await listFiles(folderId, accessToken);
+        result = formatFilesResponse(files);
         break;
       }
 
@@ -208,13 +247,15 @@ serve(async (req: Request) => {
         if (metadata.mimeType === "application/vnd.google-apps.document") {
           // Export Google Doc as docx
           downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document`;
+        } else if (metadata.mimeType === "application/vnd.google-apps.spreadsheet") {
+          // Export Google Sheet as xlsx
+          downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`;
         } else {
           // Regular file - use direct download
           downloadUrl = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`;
         }
 
         // Return the download URL with auth token embedded (for client to use)
-        // Note: For security, we proxy the download through our function
         return new Response(JSON.stringify({
           success: true,
           downloadUrl: downloadUrl,
@@ -255,11 +296,3 @@ serve(async (req: Request) => {
     );
   }
 });
-
-// Helper to determine file type from MIME type
-function getFileType(mimeType: string): string {
-  if (mimeType === "application/pdf") return "pdf";
-  if (mimeType.startsWith("video/")) return "mp4";
-  if (mimeType.startsWith("image/")) return "image";
-  return "other";
-}

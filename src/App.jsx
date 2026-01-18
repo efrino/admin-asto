@@ -10,6 +10,7 @@ import { QuizzesTab } from './components/QuizzesTab';
 import { MecaSheetTab } from './components/MecaSheetTab';
 import { ErrorCodesTab } from './components/ErrorCodesTab';
 import { MecaAidTab } from './components/MecaAidTab';
+import { AnimationsTab } from './components/AnimationsTab';
 import { supabase } from './config/supabase';
 
 function App() {
@@ -118,6 +119,15 @@ function App() {
               Modules
             </button>
             <button
+              onClick={() => setActiveTab('animations')}
+              className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'animations'
+                ? 'border-b-2 border-teal-600 text-teal-600'
+                : 'text-gray-500 hover:text-gray-700'
+                }`}
+            >
+              Animations
+            </button>
+            <button
               onClick={() => setActiveTab('meca_sheet')}
               className={`pb-3 px-3 font-semibold transition-colors whitespace-nowrap text-sm ${activeTab === 'meca_sheet'
                 ? 'border-b-2 border-green-600 text-green-600'
@@ -166,6 +176,7 @@ function App() {
 
           {activeTab === 'users' && <UsersTab onStatsUpdate={calculateStats} />}
           {activeTab === 'modules' && <ModulesTab admin={admin} onStatsUpdate={calculateStats} />}
+          {activeTab === 'animations' && <AnimationsTab admin={admin} onStatsUpdate={calculateStats} />}
           {activeTab === 'meca_sheet' && <MecaSheetTab admin={admin} onStatsUpdate={calculateStats} />}
           {activeTab === 'meca_aid' && <MecaAidTab admin={admin} onStatsUpdate={calculateStats} />}
           {activeTab === 'error_codes' && <ErrorCodesTab admin={admin} onStatsUpdate={calculateStats} />}
