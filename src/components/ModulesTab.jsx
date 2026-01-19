@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import {
     Plus, Edit2, Trash2, Save, X, FileText, Video, Image, ExternalLink,
     GripVertical, FolderOpen, Search, RefreshCw, Check, Eye,
-    CheckCircle, AlertCircle, File, Upload
+    CheckCircle, AlertCircle, File, Upload, MoreVertical
 } from 'lucide-react';
 import { supabase } from '../config/supabase';
 import {
@@ -19,6 +19,7 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
     // State
     const [modules, setModules] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [activeDropdown, setActiveDropdown] = useState(null);
 
     // Form State (untuk Add Manual dan Edit)
     const [showForm, setShowForm] = useState(false);
@@ -59,6 +60,13 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
 
     useEffect(() => {
         fetchModules();
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = () => setActiveDropdown(null);
+        document.addEventListener('click', handleClickOutside);
+        return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
     // ==================== DATA FUNCTIONS ====================
@@ -202,6 +210,7 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
             is_active: module.is_active
         });
         setShowForm(true);
+        setActiveDropdown(null);
     };
 
     const resetForm = () => {
@@ -338,12 +347,13 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
 
     // ==================== HELPER FUNCTIONS ====================
 
-    const getFileTypeIcon = (type) => {
+    const getFileTypeIcon = (type, size = 'md') => {
+        const sizeClass = size === 'sm' ? 'w-4 h-4' : 'w-5 h-5';
         switch (type) {
-            case 'pdf': return <FileText className="w-5 h-5 text-red-500" />;
-            case 'mp4': return <Video className="w-5 h-5 text-blue-500" />;
-            case 'image': return <Image className="w-5 h-5 text-green-500" />;
-            default: return <FileText className="w-5 h-5 text-gray-500" />;
+            case 'pdf': return <FileText className={`${sizeClass} text-red-500`} />;
+            case 'mp4': return <Video className={`${sizeClass} text-blue-500`} />;
+            case 'image': return <Image className={`${sizeClass} text-green-500`} />;
+            default: return <FileText className={`${sizeClass} text-gray-500`} />;
         }
     };
 
@@ -351,47 +361,53 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
         f.name.toLowerCase().includes(driveSearchQuery.toLowerCase())
     );
 
+    const toggleDropdown = (e, id) => {
+        e.stopPropagation();
+        setActiveDropdown(activeDropdown === id ? null : id);
+    };
+
     // ==================== RENDER ====================
 
     return (
         <>
             {/* Import Modal */}
             {showImportModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] sm:max-h-[90vh] flex flex-col">
                         {/* Header */}
-                        <div className="p-4 border-b flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-semibold">Import Module dari Google Drive</h3>
-                                <p className="text-sm text-gray-500">
+                        <div className="p-3 sm:p-4 border-b flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                                <h3 className="text-base sm:text-lg font-semibold truncate">Import Module dari Google Drive</h3>
+                                <p className="text-xs sm:text-sm text-gray-500">
                                     Step {importStep}/2: {importStep === 1 ? 'Pilih File' : 'Preview & Simpan'}
                                 </p>
                             </div>
-                            <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-100 rounded-lg">
+                            <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-gray-100 rounded-lg flex-shrink-0 ml-2">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-4">
+                        <div className="flex-1 overflow-y-auto p-3 sm:p-4">
                             {importStep === 1 ? (
-                                <div className="space-y-4">
+                                <div className="space-y-3 sm:space-y-4">
                                     {/* Drive Files Header */}
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h4 className="font-medium">Pilih file dari Google Drive</h4>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                        <h4 className="font-medium text-sm sm:text-base">Pilih file dari Google Drive</h4>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={loadDriveFiles}
                                                 className="p-2 hover:bg-gray-100 rounded-lg"
+                                                title="Refresh"
                                             >
                                                 <RefreshCw className={`w-4 h-4 ${loadingFiles ? 'animate-spin' : ''}`} />
                                             </button>
                                             <button
                                                 onClick={() => openDriveFolder('module', 'content')}
-                                                className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                                                className="flex items-center gap-1 text-xs sm:text-sm text-blue-600 hover:underline"
                                             >
                                                 <ExternalLink className="w-4 h-4" />
-                                                Buka Folder
+                                                <span className="hidden xs:inline">Buka Folder</span>
                                             </button>
                                         </div>
                                     </div>
@@ -404,7 +420,7 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                             value={driveSearchQuery}
                                             onChange={(e) => setDriveSearchQuery(e.target.value)}
                                             placeholder="Cari file..."
-                                            className="w-full pl-10 pr-4 py-2 border rounded-lg"
+                                            className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
                                         />
                                     </div>
 
@@ -412,32 +428,32 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                     {loadingFiles ? (
                                         <div className="text-center py-8">
                                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                                            <p className="mt-2 text-gray-500">Memuat file...</p>
+                                            <p className="mt-2 text-sm text-gray-500">Memuat file...</p>
                                         </div>
                                     ) : filteredDriveFiles.length === 0 ? (
                                         <div className="text-center py-8 text-gray-500">
-                                            <File className="w-12 h-12 mx-auto text-gray-300 mb-2" />
-                                            <p>Tidak ada file di folder Module</p>
-                                            <p className="text-sm mt-1">Upload file ke Google Drive terlebih dahulu</p>
+                                            <File className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-300 mb-2" />
+                                            <p className="text-sm sm:text-base">Tidak ada file di folder Module</p>
+                                            <p className="text-xs sm:text-sm mt-1">Upload file ke Google Drive terlebih dahulu</p>
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-80 overflow-y-auto">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 max-h-60 sm:max-h-80 overflow-y-auto">
                                             {filteredDriveFiles.map(file => (
                                                 <button
                                                     key={file.id}
                                                     onClick={() => handleDriveFileSelect(file)}
-                                                    className={`relative flex items-center gap-2 p-3 border rounded-lg text-left transition-all ${selectedFile?.id === file.id
+                                                    className={`relative flex items-center gap-2 p-2.5 sm:p-3 border rounded-lg text-left transition-all ${selectedFile?.id === file.id
                                                         ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200'
                                                         : 'hover:bg-gray-50 hover:border-gray-400'
                                                         }`}
                                                 >
                                                     {selectedFile?.id === file.id && (
-                                                        <CheckCircle className="w-5 h-5 text-blue-600 absolute top-2 right-2" />
+                                                        <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 absolute top-2 right-2" />
                                                     )}
-                                                    {getFileTypeIcon(determineFileType(file.mimeType || file.name))}
+                                                    {getFileTypeIcon(determineFileType(file.mimeType || file.name), 'sm')}
                                                     <div className="min-w-0 flex-1">
-                                                        <p className="text-sm font-medium truncate">{file.name}</p>
-                                                        <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                                                        <p className="text-xs sm:text-sm font-medium truncate pr-5">{file.name}</p>
+                                                        <p className="text-[10px] sm:text-xs text-gray-500">{formatFileSize(file.size)}</p>
                                                     </div>
                                                 </button>
                                             ))}
@@ -446,54 +462,54 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
 
                                     {/* Error Display */}
                                     {importError && (
-                                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
-                                            <AlertCircle className="w-5 h-5 text-red-600" />
-                                            <p className="text-sm text-red-600">{importError}</p>
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 sm:p-3 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 flex-shrink-0" />
+                                            <p className="text-xs sm:text-sm text-red-600">{importError}</p>
                                         </div>
                                     )}
                                 </div>
                             ) : (
-                                <div className="space-y-4">
+                                <div className="space-y-3 sm:space-y-4">
                                     {/* Selected File Info */}
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                        <h4 className="font-medium text-blue-800 mb-2">File Terpilih</h4>
-                                        <div className="flex items-center gap-3">
+                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+                                        <h4 className="font-medium text-blue-800 mb-2 text-sm sm:text-base">File Terpilih</h4>
+                                        <div className="flex items-center gap-2 sm:gap-3">
                                             {getFileTypeIcon(determineFileType(selectedFile?.mimeType || selectedFile?.name))}
-                                            <div>
-                                                <p className="font-medium">{selectedFile?.name}</p>
-                                                <p className="text-sm text-gray-500">{formatFileSize(selectedFile?.size)}</p>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium text-sm sm:text-base truncate">{selectedFile?.name}</p>
+                                                <p className="text-xs sm:text-sm text-gray-500">{formatFileSize(selectedFile?.size)}</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Form */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="md:col-span-2">
-                                            <label className="block text-sm font-medium mb-1">Title *</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs sm:text-sm font-medium mb-1">Title *</label>
                                             <input
                                                 type="text"
                                                 value={importFormData.title}
                                                 onChange={(e) => setImportFormData({ ...importFormData, title: e.target.value })}
-                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                                 placeholder="Judul module"
                                             />
                                         </div>
-                                        <div className="md:col-span-2">
-                                            <label className="block text-sm font-medium mb-1">Description</label>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs sm:text-sm font-medium mb-1">Description</label>
                                             <textarea
                                                 value={importFormData.description}
                                                 onChange={(e) => setImportFormData({ ...importFormData, description: e.target.value })}
-                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                                 rows={2}
                                                 placeholder="Deskripsi module"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">File Type</label>
+                                            <label className="block text-xs sm:text-sm font-medium mb-1">File Type</label>
                                             <select
                                                 value={importFormData.file_type}
                                                 onChange={(e) => setImportFormData({ ...importFormData, file_type: e.target.value })}
-                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                             >
                                                 <option value="pdf">PDF</option>
                                                 <option value="mp4">Video (MP4)</option>
@@ -501,23 +517,23 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Duration (minutes)</label>
+                                            <label className="block text-xs sm:text-sm font-medium mb-1">Duration (minutes)</label>
                                             <input
                                                 type="number"
                                                 value={importFormData.duration_minutes}
                                                 onChange={(e) => setImportFormData({ ...importFormData, duration_minutes: e.target.value })}
-                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                                 placeholder="0"
                                                 min="0"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium mb-1">Order Index</label>
+                                            <label className="block text-xs sm:text-sm font-medium mb-1">Order Index</label>
                                             <input
                                                 type="number"
                                                 value={importFormData.order_index}
                                                 onChange={(e) => setImportFormData({ ...importFormData, order_index: parseInt(e.target.value) || 0 })}
-                                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                                 min="0"
                                             />
                                         </div>
@@ -529,15 +545,15 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                                 onChange={(e) => setImportFormData({ ...importFormData, is_active: e.target.checked })}
                                                 className="w-4 h-4 text-blue-600"
                                             />
-                                            <label htmlFor="import_is_active" className="text-sm">Active</label>
+                                            <label htmlFor="import_is_active" className="text-xs sm:text-sm">Active</label>
                                         </div>
                                     </div>
 
                                     {/* Thumbnail Selection */}
                                     <div>
-                                        <label className="block text-sm font-medium mb-2">Thumbnail (opsional)</label>
+                                        <label className="block text-xs sm:text-sm font-medium mb-2">Thumbnail (opsional)</label>
                                         {thumbnailFiles.length > 0 ? (
-                                            <div className="grid grid-cols-4 md:grid-cols-6 gap-2 max-h-40 overflow-y-auto border rounded-lg p-2">
+                                            <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 sm:gap-2 max-h-32 sm:max-h-40 overflow-y-auto border rounded-lg p-2">
                                                 {thumbnailFiles.map(file => (
                                                     <button
                                                         key={file.id}
@@ -554,22 +570,22 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                                         />
                                                         {selectedThumbnail?.id === file.id && (
                                                             <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
-                                                                <CheckCircle className="w-6 h-6 text-blue-600" />
+                                                                <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                                                             </div>
                                                         )}
                                                     </button>
                                                 ))}
                                             </div>
                                         ) : (
-                                            <p className="text-sm text-gray-500">Tidak ada thumbnail tersedia</p>
+                                            <p className="text-xs sm:text-sm text-gray-500">Tidak ada thumbnail tersedia</p>
                                         )}
                                     </div>
 
                                     {/* Error Display */}
                                     {importError && (
-                                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2">
-                                            <AlertCircle className="w-5 h-5 text-red-600" />
-                                            <p className="text-sm text-red-600">{importError}</p>
+                                        <div className="bg-red-50 border border-red-200 rounded-lg p-2.5 sm:p-3 flex items-center gap-2">
+                                            <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-red-600 flex-shrink-0" />
+                                            <p className="text-xs sm:text-sm text-red-600">{importError}</p>
                                         </div>
                                     )}
                                 </div>
@@ -577,19 +593,19 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-4 border-t flex justify-between">
+                        <div className="p-3 sm:p-4 border-t flex flex-col sm:flex-row justify-between gap-2 sm:gap-0">
                             {importStep === 2 && (
                                 <button
                                     onClick={() => setImportStep(1)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm order-2 sm:order-1"
                                 >
                                     ← Kembali
                                 </button>
                             )}
-                            <div className="flex gap-2 ml-auto">
+                            <div className="flex gap-2 sm:ml-auto order-1 sm:order-2">
                                 <button
                                     onClick={() => setShowImportModal(false)}
-                                    className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                                    className="flex-1 sm:flex-none px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm"
                                 >
                                     Batal
                                 </button>
@@ -597,7 +613,7 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                     <button
                                         onClick={proceedToStep2}
                                         disabled={!selectedFile}
-                                        className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 text-sm"
                                     >
                                         Lanjut →
                                     </button>
@@ -605,17 +621,17 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                     <button
                                         onClick={handleImportSave}
                                         disabled={saving}
-                                        className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                                        className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 sm:px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 text-sm"
                                     >
                                         {saving ? (
                                             <>
                                                 <RefreshCw className="w-4 h-4 animate-spin" />
-                                                Menyimpan...
+                                                <span className="hidden sm:inline">Menyimpan...</span>
                                             </>
                                         ) : (
                                             <>
                                                 <Check className="w-4 h-4" />
-                                                Simpan Module
+                                                <span>Simpan</span>
                                             </>
                                         )}
                                     </button>
@@ -627,77 +643,107 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
             )}
 
             {/* Main Content */}
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Modules Management</h2>
-                <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4 sm:mb-6">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Modules Management</h2>
+
+                {/* Desktop Buttons */}
+                <div className="hidden sm:flex gap-2 sm:gap-3">
                     <button
                         onClick={() => openDriveFolder('module', 'content')}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                     >
-                        <FolderOpen className="w-5 h-5" />
-                        Buka Folder Drive
+                        <FolderOpen className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="hidden md:inline">Buka Folder Drive</span>
+                        <span className="md:hidden">Drive</span>
                     </button>
                     <button
                         onClick={openImportModal}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
                     >
-                        <Upload className="w-5 h-5" />
-                        Import dari GDrive
+                        <Upload className="w-4 h-4 sm:w-5 sm:h-5" />
+                        <span className="hidden md:inline">Import dari GDrive</span>
+                        <span className="md:hidden">Import</span>
                     </button>
                     <button
                         onClick={() => setShowForm(!showForm)}
-                        className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                        className="flex items-center gap-2 bg-blue-600 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
                     >
-                        {showForm ? <X className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
-                        {showForm ? 'Cancel' : 'Add Manual'}
+                        {showForm ? <X className="w-4 h-4 sm:w-5 sm:h-5" /> : <Plus className="w-4 h-4 sm:w-5 sm:h-5" />}
+                        <span className="hidden md:inline">{showForm ? 'Cancel' : 'Add Manual'}</span>
+                        <span className="md:hidden">{showForm ? 'Cancel' : 'Add'}</span>
+                    </button>
+                </div>
+
+                {/* Mobile Buttons */}
+                <div className="flex sm:hidden gap-2 w-full">
+                    <button
+                        onClick={() => openDriveFolder('module', 'content')}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-xs"
+                    >
+                        <FolderOpen className="w-4 h-4" />
+                        <span>Drive</span>
+                    </button>
+                    <button
+                        onClick={openImportModal}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs"
+                    >
+                        <Upload className="w-4 h-4" />
+                        <span>Import</span>
+                    </button>
+                    <button
+                        onClick={() => setShowForm(!showForm)}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 text-xs"
+                    >
+                        {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                        <span>{showForm ? 'Cancel' : 'Add'}</span>
                     </button>
                 </div>
             </div>
 
             {/* Form */}
             {showForm && (
-                <div className="bg-gray-50 rounded-xl p-6 mb-6">
-                    <h3 className="text-lg font-semibold mb-4">
+                <div className="bg-gray-50 rounded-lg sm:rounded-xl p-4 sm:p-6 mb-4 sm:mb-6">
+                    <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">
                         {editingId ? 'Edit Module' : 'Add New Module'}
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Title *</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Title *</label>
                             <input
                                 type="text"
                                 value={formData.title}
                                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                 placeholder="Judul module"
                             />
                         </div>
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium mb-1">Description</label>
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Description</label>
                             <textarea
                                 value={formData.description}
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                 rows={2}
                                 placeholder="Deskripsi module"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Google Drive File ID *</label>
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Google Drive File ID *</label>
                             <input
                                 type="text"
                                 value={formData.gdrive_file_id}
                                 onChange={(e) => setFormData({ ...formData, gdrive_file_id: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                                placeholder="File ID atau URL dari Google Drive"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                                placeholder="File ID atau URL"
                             />
-                            <p className="text-xs text-gray-500 mt-1">Bisa berupa File ID atau URL lengkap</p>
+                            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Bisa berupa File ID atau URL lengkap</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">File Type</label>
+                            <label className="block text-xs sm:text-sm font-medium mb-1">File Type</label>
                             <select
                                 value={formData.file_type}
                                 onChange={(e) => setFormData({ ...formData, file_type: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                             >
                                 <option value="pdf">PDF</option>
                                 <option value="mp4">Video (MP4)</option>
@@ -705,33 +751,33 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Thumbnail Google Drive ID</label>
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Thumbnail Google Drive ID</label>
                             <input
                                 type="text"
                                 value={formData.thumbnail_gdrive_id}
                                 onChange={(e) => setFormData({ ...formData, thumbnail_gdrive_id: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                 placeholder="ID thumbnail (opsional)"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Duration (minutes)</label>
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Duration (minutes)</label>
                             <input
                                 type="number"
                                 value={formData.duration_minutes}
                                 onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                 placeholder="0"
                                 min="0"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1">Order Index</label>
+                            <label className="block text-xs sm:text-sm font-medium mb-1">Order Index</label>
                             <input
                                 type="number"
                                 value={formData.order_index}
                                 onChange={(e) => setFormData({ ...formData, order_index: parseInt(e.target.value) || 0 })}
-                                className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 sm:px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                                 min="0"
                             />
                         </div>
@@ -743,102 +789,194 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                                 className="w-4 h-4 text-blue-600"
                             />
-                            <label htmlFor="form_is_active" className="text-sm">Active</label>
+                            <label htmlFor="form_is_active" className="text-xs sm:text-sm">Active</label>
                         </div>
                     </div>
-                    <div className="flex gap-3 mt-4">
+                    <div className="flex gap-2 sm:gap-3 mt-4">
                         <button
                             onClick={editingId ? handleUpdate : handleCreate}
-                            className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                            className="flex items-center gap-2 bg-green-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-green-700 text-sm"
                         >
-                            <Save className="w-5 h-5" />
+                            <Save className="w-4 h-4 sm:w-5 sm:h-5" />
                             {editingId ? 'Update' : 'Save'}
                         </button>
                         <button
                             onClick={resetForm}
-                            className="flex items-center gap-2 bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700"
+                            className="flex items-center gap-2 bg-gray-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-gray-700 text-sm"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4 sm:w-5 sm:h-5" />
                             Cancel
                         </button>
                     </div>
                 </div>
             )}
 
-            {/* Table */}
+            {/* Content */}
             {loading ? (
-                <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                    <p className="text-gray-600 mt-4">Loading modules...</p>
+                <div className="text-center py-8 sm:py-12">
+                    <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="text-gray-600 mt-3 sm:mt-4 text-sm sm:text-base">Loading modules...</p>
+                </div>
+            ) : modules.length === 0 ? (
+                <div className="text-center py-8 sm:py-12 text-gray-500">
+                    <FileText className="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-gray-300 mb-3 sm:mb-4" />
+                    <p className="text-base sm:text-lg font-medium">No modules found</p>
+                    <p className="text-xs sm:text-sm mt-2">Click "Add" or "Import" to create your first module</p>
                 </div>
             ) : (
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="bg-gray-100 border-b-2 border-gray-200">
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase w-12">
-                                    <GripVertical className="w-4 h-4 text-gray-400" />
-                                </th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Title</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Type</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Duration</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Created By</th>
-                                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {modules.length === 0 ? (
-                                <tr>
-                                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                                        <div className="flex flex-col items-center">
-                                            <FileText className="w-16 h-16 text-gray-300 mb-4" />
-                                            <p className="text-lg font-medium">No modules found</p>
-                                            <p className="text-sm mt-2">Click "Add Manual" or "Import dari GDrive" to create your first module</p>
+                <>
+                    {/* Mobile Card View */}
+                    <div className="sm:hidden space-y-3">
+                        {modules.map((module, index) => (
+                            <div key={module.id} className="bg-white border rounded-lg p-3 shadow-sm">
+                                <div className="flex items-start gap-3">
+                                    {/* Thumbnail/Icon */}
+                                    {module.thumbnail_gdrive_id ? (
+                                        <img
+                                            src={getThumbnailUrl(module.thumbnail_gdrive_id, 100)}
+                                            alt={module.title}
+                                            className="w-14 h-14 object-cover rounded-lg bg-gray-100 flex-shrink-0"
+                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                        />
+                                    ) : (
+                                        <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                            {getFileTypeIcon(module.file_type)}
                                         </div>
-                                    </td>
+                                    )}
+
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="font-medium text-sm text-gray-900 truncate">{module.title}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs text-gray-500 uppercase">{module.file_type}</span>
+                                                    {module.duration_minutes && (
+                                                        <span className="text-xs text-gray-400">• {module.duration_minutes} min</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Actions Dropdown */}
+                                            <div className="relative">
+                                                <button
+                                                    onClick={(e) => toggleDropdown(e, module.id)}
+                                                    className="p-1.5 hover:bg-gray-100 rounded-lg"
+                                                >
+                                                    <MoreVertical className="w-5 h-5 text-gray-500" />
+                                                </button>
+
+                                                {activeDropdown === module.id && (
+                                                    <div className="absolute right-0 top-8 bg-white border rounded-lg shadow-lg z-10 py-1 min-w-[140px]">
+                                                        {module.gdrive_url && (
+                                                            <a
+                                                                href={module.gdrive_url}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                                            >
+                                                                <Eye className="w-4 h-4" />
+                                                                View
+                                                            </a>
+                                                        )}
+                                                        <button
+                                                            onClick={() => startEdit(module)}
+                                                            className="flex items-center gap-2 px-3 py-2 text-sm text-blue-600 hover:bg-gray-50 w-full text-left"
+                                                        >
+                                                            <Edit2 className="w-4 h-4" />
+                                                            Edit
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setActiveDropdown(null);
+                                                                handleDelete(module.id);
+                                                            }}
+                                                            className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-gray-50 w-full text-left"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                            Delete
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Status & Meta */}
+                                        <div className="flex items-center gap-2 mt-2">
+                                            <button
+                                                onClick={() => handleToggleActive(module)}
+                                                className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded-full ${module.is_active
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-red-100 text-red-800'
+                                                    }`}
+                                            >
+                                                {module.is_active ? 'Active' : 'Inactive'}
+                                            </button>
+                                            <span className="text-[10px] text-gray-400">#{module.order_index || index + 1}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden sm:block overflow-x-auto">
+                        <table className="w-full">
+                            <thead>
+                                <tr className="bg-gray-100 border-b-2 border-gray-200">
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase w-12">
+                                        <GripVertical className="w-4 h-4 text-gray-400" />
+                                    </th>
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Title</th>
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Type</th>
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden md:table-cell">Duration</th>
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                                    <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase hidden lg:table-cell">Created By</th>
+                                    <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Actions</th>
                                 </tr>
-                            ) : (
-                                modules.map((module, index) => (
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                                {modules.map((module, index) => (
                                     <tr key={module.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-4 text-sm text-gray-500">
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-sm text-gray-500">
                                             {module.order_index || index + 1}
                                         </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-3">
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                            <div className="flex items-center gap-2 sm:gap-3">
                                                 {module.thumbnail_gdrive_id ? (
                                                     <img
                                                         src={getThumbnailUrl(module.thumbnail_gdrive_id, 100)}
                                                         alt={module.title}
-                                                        className="w-12 h-12 object-cover rounded-lg bg-gray-100"
+                                                        className="w-10 h-10 sm:w-12 sm:h-12 object-cover rounded-lg bg-gray-100"
                                                         onError={(e) => { e.target.style.display = 'none'; }}
                                                     />
                                                 ) : (
-                                                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center">
                                                         {getFileTypeIcon(module.file_type)}
                                                     </div>
                                                 )}
-                                                <div>
-                                                    <p className="text-sm font-medium text-gray-900">{module.title}</p>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs sm:text-sm font-medium text-gray-900 truncate max-w-[150px] lg:max-w-xs">{module.title}</p>
                                                     {module.description && (
-                                                        <p className="text-xs text-gray-500 truncate max-w-xs">{module.description}</p>
+                                                        <p className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[150px] lg:max-w-xs">{module.description}</p>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {getFileTypeIcon(module.file_type)}
-                                                <span className="text-sm text-gray-600 uppercase">{module.file_type}</span>
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4">
+                                            <div className="flex items-center gap-1 sm:gap-2">
+                                                {getFileTypeIcon(module.file_type, 'sm')}
+                                                <span className="text-xs sm:text-sm text-gray-600 uppercase">{module.file_type}</span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-4 text-sm text-gray-600">
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-600 hidden md:table-cell">
                                             {module.duration_minutes ? `${module.duration_minutes} min` : '-'}
                                         </td>
-                                        <td className="px-4 py-4">
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4">
                                             <button
                                                 onClick={() => handleToggleActive(module)}
-                                                className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${module.is_active
+                                                className={`inline-flex px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full ${module.is_active
                                                     ? 'bg-green-100 text-green-800 hover:bg-green-200'
                                                     : 'bg-red-100 text-red-800 hover:bg-red-200'
                                                     }`}
@@ -846,46 +984,48 @@ export const ModulesTab = ({ admin, onStatsUpdate }) => {
                                                 {module.is_active ? 'Active' : 'Inactive'}
                                             </button>
                                         </td>
-                                        <td className="px-4 py-4 text-sm text-gray-600">
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-xs sm:text-sm text-gray-600 hidden lg:table-cell">
                                             {module.users?.full_name || '-'}
                                         </td>
-                                        <td className="px-4 py-4 text-right space-x-2">
-                                            {module.gdrive_url && (
-                                                <a
-                                                    href={module.gdrive_url}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-1 text-green-600 hover:text-green-800"
+                                        <td className="px-3 sm:px-4 py-3 sm:py-4 text-right">
+                                            <div className="flex items-center justify-end gap-1 sm:gap-2">
+                                                {module.gdrive_url && (
+                                                    <a
+                                                        href={module.gdrive_url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 text-xs sm:text-sm"
+                                                    >
+                                                        <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                        <span className="hidden lg:inline">View</span>
+                                                    </a>
+                                                )}
+                                                <button
+                                                    onClick={() => startEdit(module)}
+                                                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs sm:text-sm"
                                                 >
-                                                    <ExternalLink className="w-4 h-4" />
-                                                    View
-                                                </a>
-                                            )}
-                                            <button
-                                                onClick={() => startEdit(module)}
-                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(module.id)}
-                                                className="inline-flex items-center gap-1 text-red-600 hover:text-red-800"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                Delete
-                                            </button>
+                                                    <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                    <span className="hidden lg:inline">Edit</span>
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(module.id)}
+                                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 text-xs sm:text-sm"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                                    <span className="hidden lg:inline">Delete</span>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             {modules.length > 0 && (
-                <div className="mt-4 text-sm text-gray-600 text-center">
+                <div className="mt-3 sm:mt-4 text-xs sm:text-sm text-gray-600 text-center">
                     Total: {modules.length} modules
                 </div>
             )}
